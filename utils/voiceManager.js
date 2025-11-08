@@ -104,10 +104,38 @@ function playSound(voiceChannel, soundFilePath, forceSwitch = false) {
   const connection = joinVoiceChannelForGuild(voiceChannel, shouldSwitch);
 
   // Create audio resource - createAudioResource will use ffmpeg automatically for MP3 files
-  const resource = createAudioResource(soundFilePath, {
-    inputType: "unknown",
-    inlineVolume: true,
-  });
+  let resource;
+  try {
+    resource = createAudioResource(soundFilePath, {
+      inputType: "unknown",
+      inlineVolume: true,
+    });
+  } catch (error) {
+    console.error(`Error creating audio resource for guild ${guildId}:`, error);
+    throw error;
+  }
+
+  // Add error handlers to resource streams to prevent crashes
+  if (resource.playStream) {
+    resource.playStream.on("error", (error) => {
+      console.error(`Audio playStream error for guild ${guildId}:`, error);
+      // Don't throw, just log
+    });
+  }
+
+  if (resource.encoder) {
+    resource.encoder.on("error", (error) => {
+      console.error(`Audio encoder error for guild ${guildId}:`, error);
+      // Don't throw, just log
+    });
+  }
+
+  if (resource.volume) {
+    resource.volume.on("error", (error) => {
+      console.error(`Audio volume transformer error for guild ${guildId}:`, error);
+      // Don't throw, just log
+    });
+  }
 
   // Create a new audio player for this sound (allows simultaneous playback)
   const player = createAudioPlayer();
@@ -115,6 +143,22 @@ function playSound(voiceChannel, soundFilePath, forceSwitch = false) {
   // Handle player errors
   player.on("error", (error) => {
     console.error(`Audio player error for guild ${guildId}:`, error);
+    // Clean up player on error
+    try {
+      player.stop();
+      if (guildPlayers.has(guildId)) {
+        const players = guildPlayers.get(guildId);
+        const index = players.indexOf(player);
+        if (index > -1) {
+          players.splice(index, 1);
+        }
+        if (players.length === 0) {
+          guildPlayers.delete(guildId);
+        }
+      }
+    } catch (cleanupError) {
+      console.error(`Error cleaning up player for guild ${guildId}:`, cleanupError);
+    }
   });
 
   // Clean up player when it finishes
@@ -143,10 +187,31 @@ function playSound(voiceChannel, soundFilePath, forceSwitch = false) {
   guildPlayers.get(guildId).push(player);
 
   // Subscribe player to connection
-  connection.subscribe(player);
+  try {
+    connection.subscribe(player);
 
-  // Play the sound
-  player.play(resource);
+    // Play the sound
+    player.play(resource);
+  } catch (error) {
+    console.error(`Error playing sound for guild ${guildId}:`, error);
+    // Clean up on error
+    try {
+      player.stop();
+      if (guildPlayers.has(guildId)) {
+        const players = guildPlayers.get(guildId);
+        const index = players.indexOf(player);
+        if (index > -1) {
+          players.splice(index, 1);
+        }
+        if (players.length === 0) {
+          guildPlayers.delete(guildId);
+        }
+      }
+    } catch (cleanupError) {
+      console.error(`Error cleaning up after play error for guild ${guildId}:`, cleanupError);
+    }
+    throw error;
+  }
 }
 
 /**

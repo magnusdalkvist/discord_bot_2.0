@@ -71,6 +71,17 @@ client.on("warn", (warning) => {
   console.warn("Discord client warning:", warning);
 });
 
+// Global error handlers to prevent crashes
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  // Don't exit, just log the error
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  // Don't exit, just log the error
+});
+
 client.commands = new Collection();
 
 const foldersPath = path.join(__dirname, "commands");
@@ -268,7 +279,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
       try {
         // Switch to user's channel if needed and play sound
-        playSound(voiceChannel, soundFilePath, true);
+        try {
+          playSound(voiceChannel, soundFilePath, true);
+        } catch (playError) {
+          console.error("Error in playSound:", playError);
+          // Don't crash, just notify user
+          throw playError;
+        }
 
         // Update the soundboard to show the same page
         if (!soundboardCommand || !soundboardCommand.renderSoundboard) {
@@ -508,6 +525,7 @@ async function playEntranceSound(voiceChannel, guildId, userId, userTag) {
         playSound(voiceChannel, soundFilePath, false);
       } catch (error) {
         console.error(`Error playing entrance sound for ${userTag}:`, error);
+        // Error is already logged, don't crash
       }
     }, 1000);
   } catch (error) {
