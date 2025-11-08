@@ -1,0 +1,31 @@
+{
+  "name": "discord_bot_2.0",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "deploy": "node deploy-commands.js",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/discord/discord-example-app.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/discord/discord-example-app/issues"
+  },
+  "homepage": "https://github.com/discord/discord-example-app#readme",
+  "dependencies": {
+    "@discordjs/voice": "^0.19.0",
+    "@snazzah/davey": "^0.1.7",
+    "discord.js": "^14.24.2",
+    "dotenv": "^17.2.3",
+    "ffmpeg-static": "^5.2.0",
+    "opusscript": "^0.0.8",
+    "sodium-native": "^5.0.9"
+  }
+}
