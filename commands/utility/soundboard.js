@@ -34,7 +34,6 @@ function getSortedSounds() {
 
 // Helper function to render entrance sound selection (similar to soundboard but for selecting entrance sound)
 async function renderEntranceSoundSelection(interaction, page = 1) {
-  const fs = require("fs");
   const rows = 3;
   const columns = 3;
   const allSounds = getSortedSounds();
