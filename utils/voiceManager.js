@@ -104,41 +104,65 @@ function playSound(voiceChannel, soundFilePath, forceSwitch = false) {
   const connection = joinVoiceChannelForGuild(voiceChannel, shouldSwitch);
 
   // Create audio resource - createAudioResource will use ffmpeg automatically for MP3 files
+  // Note: inlineVolume is disabled to prevent buffer alignment issues with Opus encoder
   let resource;
   try {
     resource = createAudioResource(soundFilePath, {
       inputType: "unknown",
-      inlineVolume: true,
+      inlineVolume: false,
     });
   } catch (error) {
     console.error(`Error creating audio resource for guild ${guildId}:`, error);
     throw error;
   }
 
+  // Create a new audio player for this sound (allows simultaneous playback)
+  const player = createAudioPlayer();
+
+  // Helper function to clean up player on stream errors
+  const cleanupPlayerOnError = () => {
+    try {
+      player.stop();
+      // Remove from guild players
+      if (guildPlayers.has(guildId)) {
+        const players = guildPlayers.get(guildId);
+        const index = players.indexOf(player);
+        if (index > -1) {
+          players.splice(index, 1);
+        }
+        if (players.length === 0) {
+          guildPlayers.delete(guildId);
+        }
+      }
+    } catch (cleanupError) {
+      console.error(`Error cleaning up player for guild ${guildId}:`, cleanupError);
+    }
+  };
+
   // Add error handlers to resource streams to prevent crashes
   if (resource.playStream) {
     resource.playStream.on("error", (error) => {
       console.error(`Audio playStream error for guild ${guildId}:`, error);
-      // Don't throw, just log
+      cleanupPlayerOnError();
     });
   }
 
   if (resource.encoder) {
     resource.encoder.on("error", (error) => {
       console.error(`Audio encoder error for guild ${guildId}:`, error);
-      // Don't throw, just log
+      // Stop the player and clean up when encoder fails
+      cleanupPlayerOnError();
     });
   }
 
   if (resource.volume) {
     resource.volume.on("error", (error) => {
       console.error(`Audio volume transformer error for guild ${guildId}:`, error);
-      // Don't throw, just log
+      // Stop the player and clean up when volume transformer fails
+      // This prevents the audio system from getting stuck
+      cleanupPlayerOnError();
     });
   }
-
-  // Create a new audio player for this sound (allows simultaneous playback)
-  const player = createAudioPlayer();
 
   // Handle player errors
   player.on("error", (error) => {
