@@ -1,13 +1,19 @@
 {
-  "activePollId": "",
-  "activePollCreatedByUserId": "",
+  "activePollId": "1468010764882153568",
+  "activePollCreatedByUserId": "153183545005703168",
   "pendingEvents": {},
   "movies": [
     {
-      "suggestedByUserId": "307226562065989634",
       "movieName": "Bring Her Back",
       "movieId": "tt32246771",
-      "watched": false
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
+    },
+    {
+      "movieName": "Nuremberg",
+      "movieId": "tt29567915",
+      "watched": false,
+      "suggestedByUserId": "259311300834885633"
     }
   ],
   "nights": []
