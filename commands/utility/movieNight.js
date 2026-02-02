@@ -35,14 +35,10 @@ const data = new SlashCommandBuilder()
       .setName("suggest")
       .setDescription("Add a movie to the movie night suggestion list")
       .addStringOption((option) =>
-        option
-          .setName("imdb_url")
-          .setDescription("The IMDB URL of the movie"),
+        option.setName("imdb_url").setDescription("The IMDB URL of the movie"),
       )
       .addStringOption((option) =>
-        option
-          .setName("movie_name")
-          .setDescription("Search by movie name"),
+        option.setName("movie_name").setDescription("Search by movie name"),
       ),
   )
   .addSubcommand((subcommand) =>
@@ -76,7 +72,7 @@ module.exports = {
         const moviesForPoll = shuffled.slice(0, 10);
 
         const reply = await interaction.reply({
-          fetchReply: true,
+          withResponse: true,
           poll: {
             allowMultiselect: true,
             answers: moviesForPoll.map((movie) => ({ text: movie.movieName })),
@@ -92,7 +88,10 @@ module.exports = {
       }
       // start the movie night. find the last sent poll and end the poll. then create an event for the selected movie from the poll results.
       case "start": {
-        if (movieNightData.activePollCreatedByUserId && movieNightData.activePollCreatedByUserId !== interaction.user.id) {
+        if (
+          movieNightData.activePollCreatedByUserId &&
+          movieNightData.activePollCreatedByUserId !== interaction.user.id
+        ) {
           await interaction.reply({
             content: "Only the person who started the vote can start the movie night.",
             ephemeral: true,
@@ -271,13 +270,16 @@ module.exports = {
           movieData = await movieRequest.json();
         } else {
           const searchRequest = await fetch(
-            `https://api.imdbapi.dev/search/titles?query=${encodeURIComponent(movieNameQuery)}`
+            `https://api.imdbapi.dev/search/titles?query=${encodeURIComponent(movieNameQuery)}`,
           );
           const searchResponse = await searchRequest.json();
           const titles = searchResponse.titles || [];
           const firstMovie = titles.find((t) => t.type === "movie") || titles[0];
           if (!firstMovie || !firstMovie.id) {
-            await interaction.reply({ content: "No movie found for that search.", ephemeral: true });
+            await interaction.reply({
+              content: "No movie found for that search.",
+              ephemeral: true,
+            });
             break;
           }
           movieId = firstMovie.id;
@@ -369,7 +371,7 @@ module.exports = {
         }
         const movieTitle = night.movieName || "the movie";
         const pollMessage = await interaction.reply({
-          fetchReply: true,
+          withResponse: true,
           poll: {
             question: { text: `How much did you enjoy "${movieTitle}"?` },
             answers: [
