@@ -15,7 +15,7 @@ const slashData = new SlashCommandBuilder()
     option
       .setName("user")
       .setDescription("The user whose nickname you want to change")
-      .setRequired(true)
+      .setRequired(true),
   );
 
 const menuData = new ContextMenuCommandBuilder()
@@ -27,17 +27,15 @@ function buildModal(customId, title = "Change nickname") {
     .setCustomId(customId)
     .setTitle(title)
     .setLabelComponents([
-      new LabelBuilder()
-        .setLabel("New Nickname")
-        .setTextInputComponent(
-          new TextInputBuilder({
-            custom_id: "nickname",
-            style: TextInputStyle.Short,
-            placeholder: "Enter new nickname (leave empty to remove)",
-            required: false,
-            max_length: 32,
-          })
-        ),
+      new LabelBuilder().setLabel("New Nickname").setTextInputComponent(
+        new TextInputBuilder({
+          custom_id: "nickname",
+          style: TextInputStyle.Short,
+          placeholder: "Enter new nickname (leave empty to remove)",
+          required: false,
+          max_length: 32,
+        }),
+      ),
     ]);
 }
 

@@ -1,12 +1,16 @@
 {
-  "activePollId": "1467646926059995187",
+  "activePollId": "1467984505271750829",
+  "pendingEvents": {},
   "movies": [
     {
-      "movieName": "Stor Ståhaj",
-      "rating": null,
-      "votes": 0,
-      "watched": false,
-      "suggestedBy": "Magndut"
+      "movieName": "Spider-Man: Into the Spider-Verse",
+      "movieId": "tt4633694",
+      "watched": false
+    },
+    {
+      "movieName": "Bring Her Back",
+      "movieId": "tt32246771",
+      "watched": false
     }
   ],
   "nights": []

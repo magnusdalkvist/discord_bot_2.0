@@ -13,10 +13,15 @@ const {
 const { token } = require("./config");
 const { playSound, isConnected, leaveIfAlone } = require("./utils/voiceManager");
 const { getEntranceSound, setEntranceSound } = require("./utils/entranceSounds");
+const { movienightPath } = require("./utils/movieNightPolls");
 
 // Create a new client instance
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildScheduledEvents,
+  ],
 });
 
 // When the client is ready, run this code (only once).
@@ -43,7 +48,7 @@ client.once(Events.ClientReady, async (readyClient) => {
 
     // Find any voice channel with non-bot members
     const voiceChannels = guild.channels.cache.filter(
-      (channel) => channel.isVoiceBased() && channel.members.size > 0
+      (channel) => channel.isVoiceBased() && channel.members.size > 0,
     );
 
     for (const channel of voiceChannels.values()) {
@@ -99,12 +104,112 @@ for (const folder of commandFolders) {
         client.commands.set(command.data.name, command);
       } else {
         console.log(
-          `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`
+          `[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`,
         );
       }
     }
   }
 }
+
+client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
+  const oldStatus = oldEvent?.status ?? "none";
+  const newStatus = newEvent?.status ?? "none";
+  console.log("[Movie Night] GuildScheduledEventUpdate:", {
+    id: newEvent.id,
+    name: newEvent.name,
+    oldStatus,
+    newStatus,
+  });
+
+  if (!newEvent.name || !newEvent.name.startsWith("Movie Night:")) {
+    console.log("[Movie Night] Skipping: not a Movie Night event");
+    return;
+  }
+  console.log("[Movie Night] Handling Movie Night event");
+
+  const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
+  if (!data.pendingEvents) data.pendingEvents = {};
+  if (!data.nights) data.nights = [];
+
+  // Use numeric status so we work even if gateway sends status as string (e.g. "2" vs 2)
+  const newStatusNum = Number(newEvent.status);
+  const oldStatusNum = oldEvent != null ? Number(oldEvent.status) : null;
+
+  if (newStatusNum === 4) {
+    console.log("[Movie Night] Event canceled, cleaning up");
+    delete data.pendingEvents[newEvent.id];
+    data.nights = data.nights.filter((n) => n.eventId !== newEvent.id);
+    fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+    return;
+  }
+
+  if (newStatusNum === 2 && oldStatusNum !== 2) {
+    console.log("[Movie Night] Event started (Scheduled → Active)");
+    const meta = data.pendingEvents[newEvent.id];
+    if (meta) {
+      console.log("[Movie Night] Adding night from pendingEvents:", meta.movieName);
+      data.nights.push({
+        eventId: newEvent.id,
+        movieId: meta.movieId,
+        movieName: meta.movieName,
+        channelId: meta.channelId,
+        guildId: meta.guildId,
+        startTime: Date.now(),
+      });
+      delete data.pendingEvents[newEvent.id];
+      fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+    } else {
+      console.log("[Movie Night] No pendingEvents entry for event id:", newEvent.id);
+    }
+    return;
+  }
+
+  // Event ended (Active → Completed). Only ensure night exists and mark movie as watched; rating poll is created via /movienight rate.
+  if (newStatusNum === 3 && oldStatusNum !== 3) {
+    console.log("[Movie Night] Event ended (→ Completed)");
+    let night = data.nights.find((n) => n.eventId === newEvent.id);
+    if (!night) {
+      console.log("[Movie Night] No night found, checking pendingEvents");
+      const meta = data.pendingEvents[newEvent.id];
+      if (!meta) {
+        console.log("[Movie Night] No pendingEvents for event id:", newEvent.id, "- skipping");
+        return;
+      }
+      console.log("[Movie Night] Creating night from pendingEvents:", meta.movieName);
+      night = {
+        eventId: newEvent.id,
+        movieId: meta.movieId,
+        movieName: meta.movieName,
+        channelId: meta.channelId,
+        guildId: meta.guildId,
+        startTime: Date.now(),
+      };
+      data.nights.push(night);
+      delete data.pendingEvents[newEvent.id];
+    }
+    const movie = (data.movies || []).find((m) => m.movieId === night.movieId);
+    if (movie) movie.watched = true;
+    fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+    console.log(
+      "[Movie Night] Movie marked as watched. Use /movienight rate to create a rating poll.",
+    );
+  } else {
+    console.log(
+      "[Movie Night] No branch matched (not canceled/active/completed or already completed)",
+    );
+  }
+});
+
+client.on(Events.GuildScheduledEventDelete, async (event) => {
+  if (!event.name || !event.name.startsWith("Movie Night:")) return;
+  console.log("[Movie Night] GuildScheduledEventDelete:", { id: event.id, name: event.name });
+  const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
+  if (!data.pendingEvents) data.pendingEvents = {};
+  delete data.pendingEvents[event.id];
+  data.nights = (data.nights || []).filter((n) => n.eventId !== event.id);
+  fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+  console.log("[Movie Night] Cleaned up pendingEvents and nights for deleted event");
+});
 
 client.on(Events.InteractionCreate, async (interaction) => {
   if (interaction.isModalSubmit()) {
@@ -208,21 +313,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
       return;
     }
-
-    if (interaction.customId === "movieNightSuggestionModal") {
-      const movie = {
-        movieName: interaction.fields.getTextInputValue("movieName"),
-        rating: null,
-        votes: 0,
-        watched: false,
-        suggestedBy: interaction.user.globalName,
-      };
-      const movieNightData = require("./movienight.json");
-      movieNightData.movies.push(movie);
-      fs.writeFileSync("movienight.json", JSON.stringify(movieNightData, null, 2));
-      await interaction.reply({ content: `Movie "${movie.movieName}" added to the suggestion list` });
-      return;
-    }
   }
 
   // Handle button interactions for pagination and sound playback
@@ -235,7 +325,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!soundboardCommand || !soundboardCommand.renderSoundboard) {
         await interaction.reply({
           content: "Error: Soundboard command not found.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -262,7 +352,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!soundboardCommand || !soundboardCommand.getSortedSounds) {
         await interaction.reply({
           content: "Error: Soundboard command not found.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -272,7 +362,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!member || !member.voice || !member.voice.channel) {
         await interaction.reply({
           content: "You need to be in a voice channel to play sounds!",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -286,7 +376,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (soundIndex < 0 || soundIndex >= allSounds.length) {
         await interaction.reply({
           content: "Error: Sound not found.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -342,7 +432,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!soundboardCommand || !soundboardCommand.renderSoundboard) {
         await interaction.reply({
           content: "Error: Soundboard command not found.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -402,7 +492,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
       // Render the entrance sound selection with the new page
       const response = await soundboardCommand.renderEntranceSoundSelection(
         interaction,
-        currentPage
+        currentPage,
       );
       await interaction.update(response);
       return;
@@ -598,7 +688,7 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 // Log in to Discord with your client's token
 if (!token) {
   console.error(
-    "ERROR: Bot token is missing! Please check your .env file and make sure TOKEN is set."
+    "ERROR: Bot token is missing! Please check your .env file and make sure TOKEN is set.",
   );
   process.exit(1);
 }

@@ -23,7 +23,7 @@ const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) => subcommand.setName("show").setDescription("show the soundboard"))
   .addSubcommand((subcommand) => subcommand.setName("upload").setDescription("Upload a sound"))
   .addSubcommand((subcommand) =>
-    subcommand.setName("entrance").setDescription("Set your entrance sound")
+    subcommand.setName("entrance").setDescription("Set your entrance sound"),
   );
 
 // Helper function to get sorted sound list
@@ -58,7 +58,7 @@ async function renderEntranceSoundSelection(interaction, page = 1) {
         new ButtonBuilder()
           .setCustomId(`set_entrance_${(page - 1) * rows * columns + soundIdx}`)
           .setLabel(soundName)
-          .setStyle(ButtonStyle.Secondary)
+          .setStyle(ButtonStyle.Secondary),
       );
     }
     // Wrap the 3 buttons in an ActionRowBuilder
@@ -95,7 +95,7 @@ async function renderEntranceSoundSelection(interaction, page = 1) {
       .setCustomId(`entrance_next_page_${page}`)
       .setLabel("→")
       .setStyle(page === totalPages ? ButtonStyle.Secondary : ButtonStyle.Primary)
-      .setDisabled(page === totalPages)
+      .setDisabled(page === totalPages),
   );
 
   return {
@@ -131,7 +131,7 @@ async function renderSoundboard(interaction, page = 1) {
         new ButtonBuilder()
           .setCustomId(`play_sound_${(page - 1) * rows * columns + soundIdx}`)
           .setLabel(soundName)
-          .setStyle(ButtonStyle.Secondary)
+          .setStyle(ButtonStyle.Secondary),
       );
     }
     // Wrap the 3 buttons in an ActionRowBuilder
@@ -169,7 +169,7 @@ async function renderSoundboard(interaction, page = 1) {
       .setCustomId(`next_page_${page}`)
       .setLabel("→")
       .setStyle(page === totalPages ? ButtonStyle.Secondary : ButtonStyle.Primary)
-      .setDisabled(page === totalPages)
+      .setDisabled(page === totalPages),
   );
 
   return {
@@ -198,14 +198,14 @@ module.exports = {
                 placeholder: "Enter a name for the sound",
                 required: true,
                 max_length: 20,
-              })
+              }),
             ),
             new LabelBuilder().setLabel("Sound File").setFileUploadComponent(
               new FileUploadBuilder({
                 custom_id: "sound_file",
                 min_values: 1,
                 max_values: 1,
-              }).setRequired()
+              }).setRequired(),
             ),
             new LabelBuilder().setLabel("Set as entrance").setStringSelectMenuComponent(
               new StringSelectMenuBuilder()
@@ -217,7 +217,7 @@ module.exports = {
                     .setValue("no")
                     .setDefault(true),
                   new StringSelectMenuOptionBuilder().setLabel("Yes").setValue("yes"),
-                ])
+                ]),
             ),
           ]);
 
