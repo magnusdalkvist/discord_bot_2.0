@@ -3,11 +3,6 @@
   "pendingEvents": {},
   "movies": [
     {
-      "movieName": "Spider-Man: Into the Spider-Verse",
-      "movieId": "tt4633694",
-      "watched": false
-    },
-    {
       "movieName": "Bring Her Back",
       "movieId": "tt32246771",
       "watched": false

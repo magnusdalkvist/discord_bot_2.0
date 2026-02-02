@@ -35,7 +35,14 @@ const data = new SlashCommandBuilder()
       .setName("suggest")
       .setDescription("Add a movie to the movie night suggestion list")
       .addStringOption((option) =>
-        option.setName("imdb_url").setDescription("The IMDB URL of the movie").setRequired(true),
+        option
+          .setName("imdb_url")
+          .setDescription("The IMDB URL of the movie"),
+      )
+      .addStringOption((option) =>
+        option
+          .setName("movie_name")
+          .setDescription("Search by movie name"),
       ),
   )
   .addSubcommand((subcommand) =>
@@ -216,17 +223,53 @@ module.exports = {
 
         break;
       }
-      // add a movie to the movie night suggestion list. (movieNightData.movies). Add a modal to add a movie to the suggestion list. The modal should have a text input for the movie name and a button to add the movie to the suggestion list.
       case "suggest": {
         const imdbUrl = interaction.options.getString("imdb_url");
-        if (!imdbUrl.match(/https:\/\/www\.imdb\.com\/title\/tt\d+/)) {
-          await interaction.reply({ content: "Invalid IMDB URL.", ephemeral: true });
+        const movieNameQuery = interaction.options.getString("movie_name");
+
+        if (!imdbUrl && !movieNameQuery) {
+          await interaction.reply({
+            content: "Provide either **imdb_url** or **movie_name**.",
+            ephemeral: true,
+          });
           break;
         }
-        const movieIdMatch = imdbUrl.match(/title\/(tt\d+)/);
-        const movieId = movieIdMatch ? movieIdMatch[1] : null;
-        const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
-        const movieData = await movieRequest.json();
+        if (imdbUrl && movieNameQuery) {
+          await interaction.reply({
+            content: "Provide only one of **imdb_url** or **movie_name**, not both.",
+            ephemeral: true,
+          });
+          break;
+        }
+
+        let movieId;
+        let movieData;
+
+        if (imdbUrl) {
+          if (!imdbUrl.match(/https:\/\/www\.imdb\.com\/title\/tt\d+/)) {
+            await interaction.reply({ content: "Invalid IMDB URL.", ephemeral: true });
+            break;
+          }
+          const movieIdMatch = imdbUrl.match(/title\/(tt\d+)/);
+          movieId = movieIdMatch ? movieIdMatch[1] : null;
+          const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
+          movieData = await movieRequest.json();
+        } else {
+          const searchRequest = await fetch(
+            `https://api.imdbapi.dev/search/titles?query=${encodeURIComponent(movieNameQuery)}`
+          );
+          const searchResponse = await searchRequest.json();
+          const titles = searchResponse.titles || [];
+          const firstMovie = titles.find((t) => t.type === "movie") || titles[0];
+          if (!firstMovie || !firstMovie.id) {
+            await interaction.reply({ content: "No movie found for that search.", ephemeral: true });
+            break;
+          }
+          movieId = firstMovie.id;
+          const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
+          movieData = await movieRequest.json();
+        }
+
         if (!movieData) {
           await interaction.reply({ content: "Movie not found.", ephemeral: true });
           break;
@@ -258,11 +301,12 @@ module.exports = {
         }
         fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
 
+        const imdbLink = imdbUrl || `https://www.imdb.com/title/${movieId}/`;
         const embed = new EmbedBuilder()
           .setTitle(movieName)
           .setDescription(movieData.plot)
           .setThumbnail(movieData.primaryImage?.url || null)
-          .setURL(imdbUrl)
+          .setURL(imdbLink)
           .setFooter({
             text: `IMDB Rating: ${movieData.rating?.aggregateRating}/10 (${movieData.rating?.voteCount} votes)`,
           });
