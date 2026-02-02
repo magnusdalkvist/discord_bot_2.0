@@ -137,6 +137,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
   if (newStatusNum === 2 && oldStatusNum !== 2) {
     const meta = data.pendingEvents[newEvent.id];
     if (meta) {
+      const movieEntry = (data.movies || []).find((m) => m.movieId === meta.movieId);
       data.nights.push({
         eventId: newEvent.id,
         movieId: meta.movieId,
@@ -144,6 +145,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
         channelId: meta.channelId,
         guildId: meta.guildId,
         startTime: Date.now(),
+        suggestedByUserId: movieEntry?.suggestedByUserId ?? null,
       });
       delete data.pendingEvents[newEvent.id];
       fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
@@ -159,6 +161,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
       if (!meta) {
         return;
       }
+      const movieEntry = (data.movies || []).find((m) => m.movieId === meta.movieId);
       night = {
         eventId: newEvent.id,
         movieId: meta.movieId,
@@ -166,6 +169,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
         channelId: meta.channelId,
         guildId: meta.guildId,
         startTime: Date.now(),
+        suggestedByUserId: movieEntry?.suggestedByUserId ?? null,
       };
       data.nights.push(night);
       delete data.pendingEvents[newEvent.id];
