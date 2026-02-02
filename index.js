@@ -114,18 +114,10 @@ for (const folder of commandFolders) {
 client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
   const oldStatus = oldEvent?.status ?? "none";
   const newStatus = newEvent?.status ?? "none";
-  console.log("[Movie Night] GuildScheduledEventUpdate:", {
-    id: newEvent.id,
-    name: newEvent.name,
-    oldStatus,
-    newStatus,
-  });
 
   if (!newEvent.name || !newEvent.name.startsWith("Movie Night:")) {
-    console.log("[Movie Night] Skipping: not a Movie Night event");
     return;
   }
-  console.log("[Movie Night] Handling Movie Night event");
 
   const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
   if (!data.pendingEvents) data.pendingEvents = {};
@@ -136,7 +128,6 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
   const oldStatusNum = oldEvent != null ? Number(oldEvent.status) : null;
 
   if (newStatusNum === 4) {
-    console.log("[Movie Night] Event canceled, cleaning up");
     delete data.pendingEvents[newEvent.id];
     data.nights = data.nights.filter((n) => n.eventId !== newEvent.id);
     fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
@@ -144,10 +135,8 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
   }
 
   if (newStatusNum === 2 && oldStatusNum !== 2) {
-    console.log("[Movie Night] Event started (Scheduled → Active)");
     const meta = data.pendingEvents[newEvent.id];
     if (meta) {
-      console.log("[Movie Night] Adding night from pendingEvents:", meta.movieName);
       data.nights.push({
         eventId: newEvent.id,
         movieId: meta.movieId,
@@ -158,24 +147,18 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
       });
       delete data.pendingEvents[newEvent.id];
       fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
-    } else {
-      console.log("[Movie Night] No pendingEvents entry for event id:", newEvent.id);
     }
     return;
   }
 
   // Event ended (Active → Completed). Only ensure night exists and mark movie as watched; rating poll is created via /movienight rate.
   if (newStatusNum === 3 && oldStatusNum !== 3) {
-    console.log("[Movie Night] Event ended (→ Completed)");
     let night = data.nights.find((n) => n.eventId === newEvent.id);
     if (!night) {
-      console.log("[Movie Night] No night found, checking pendingEvents");
       const meta = data.pendingEvents[newEvent.id];
       if (!meta) {
-        console.log("[Movie Night] No pendingEvents for event id:", newEvent.id, "- skipping");
         return;
       }
-      console.log("[Movie Night] Creating night from pendingEvents:", meta.movieName);
       night = {
         eventId: newEvent.id,
         movieId: meta.movieId,
@@ -190,25 +173,16 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
     const movie = (data.movies || []).find((m) => m.movieId === night.movieId);
     if (movie) movie.watched = true;
     fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
-    console.log(
-      "[Movie Night] Movie marked as watched. Use /movienight rate to create a rating poll.",
-    );
-  } else {
-    console.log(
-      "[Movie Night] No branch matched (not canceled/active/completed or already completed)",
-    );
   }
 });
 
 client.on(Events.GuildScheduledEventDelete, async (event) => {
   if (!event.name || !event.name.startsWith("Movie Night:")) return;
-  console.log("[Movie Night] GuildScheduledEventDelete:", { id: event.id, name: event.name });
   const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
   if (!data.pendingEvents) data.pendingEvents = {};
   delete data.pendingEvents[event.id];
   data.nights = (data.nights || []).filter((n) => n.eventId !== event.id);
   fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
-  console.log("[Movie Night] Cleaned up pendingEvents and nights for deleted event");
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
