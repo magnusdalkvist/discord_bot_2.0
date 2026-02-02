@@ -60,7 +60,7 @@ module.exports = {
       case "vote": {
         const filteredMovies = movieNightData.movies.filter((movie) => movie.watched === false);
         if (filteredMovies.length === 0) {
-          await interaction.reply({ content: "No movies to vote on.", ephemeral: true });
+          await interaction.reply({ content: "No movies to vote on.", flags: MessageFlags.Ephemeral });
           break;
         }
 
@@ -94,7 +94,7 @@ module.exports = {
         ) {
           await interaction.reply({
             content: "Only the person who started the vote can start the movie night.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           break;
         }
@@ -105,12 +105,12 @@ module.exports = {
         const message = Array.from(messages.values())[0];
         const poll = message.poll;
         if (!poll || poll.resultsFinalized) {
-          await interaction.reply({ content: "No active poll found.", ephemeral: true });
+          await interaction.reply({ content: "No active poll found.", flags: MessageFlags.Ephemeral });
           break;
         }
 
         await poll.end();
-        await interaction.reply({ content: "Ending poll...", ephemeral: true });
+        await interaction.reply({ content: "Ending poll...", flags: MessageFlags.Ephemeral });
         await interaction.deleteReply();
 
         // Find the poll answer with the most votes
@@ -140,7 +140,7 @@ module.exports = {
         const imdbMovie = await imdbMovieRequest.json();
 
         if (!imdbMovie) {
-          await interaction.reply({ content: "Movie not found.", ephemeral: true });
+          await interaction.reply({ content: "Movie not found.", flags: MessageFlags.Ephemeral });
           break;
         }
 
@@ -244,14 +244,14 @@ module.exports = {
         if (!imdbUrl && !movieNameQuery) {
           await interaction.reply({
             content: "Provide either **imdb_url** or **movie_name**.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           break;
         }
         if (imdbUrl && movieNameQuery) {
           await interaction.reply({
             content: "Provide only one of **imdb_url** or **movie_name**, not both.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           break;
         }
@@ -261,7 +261,7 @@ module.exports = {
 
         if (imdbUrl) {
           if (!imdbUrl.match(/https:\/\/www\.imdb\.com\/title\/tt\d+/)) {
-            await interaction.reply({ content: "Invalid IMDB URL.", ephemeral: true });
+            await interaction.reply({ content: "Invalid IMDB URL.", flags: MessageFlags.Ephemeral });
             break;
           }
           const movieIdMatch = imdbUrl.match(/title\/(tt\d+)/);
@@ -278,7 +278,7 @@ module.exports = {
           if (!firstMovie || !firstMovie.id) {
             await interaction.reply({
               content: "No movie found for that search.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             break;
           }
@@ -288,11 +288,11 @@ module.exports = {
         }
 
         if (!movieData) {
-          await interaction.reply({ content: "Movie not found.", ephemeral: true });
+          await interaction.reply({ content: "Movie not found.", flags: MessageFlags.Ephemeral });
           break;
         }
         if (movieData.type !== "movie") {
-          await interaction.reply({ content: "This is not a movie.", ephemeral: true });
+          await interaction.reply({ content: "This is not a movie.", flags: MessageFlags.Ephemeral });
           break;
         }
         if (
@@ -354,7 +354,7 @@ module.exports = {
           .setTitle("Movie Night history")
           .setDescription(lines.join("\n"))
           .setTimestamp();
-        await interaction.reply({ embeds: [embed], ephemeral: true });
+        await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
         break;
       }
       case "rate": {
