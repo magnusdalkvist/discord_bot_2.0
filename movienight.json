@@ -4,6 +4,7 @@
   "pendingEvents": {},
   "movies": [
     {
+      "suggestedByUserId": "307226562065989634",
       "movieName": "Bring Her Back",
       "movieId": "tt32246771",
       "watched": false

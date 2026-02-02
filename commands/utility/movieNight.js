@@ -60,7 +60,10 @@ module.exports = {
       case "vote": {
         const filteredMovies = movieNightData.movies.filter((movie) => movie.watched === false);
         if (filteredMovies.length === 0) {
-          await interaction.reply({ content: "No movies to vote on.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({
+            content: "No movies to vote on.",
+            flags: MessageFlags.Ephemeral,
+          });
           break;
         }
 
@@ -105,7 +108,10 @@ module.exports = {
         const message = Array.from(messages.values())[0];
         const poll = message.poll;
         if (!poll || poll.resultsFinalized) {
-          await interaction.reply({ content: "No active poll found.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({
+            content: "No active poll found.",
+            flags: MessageFlags.Ephemeral,
+          });
           break;
         }
 
@@ -261,7 +267,10 @@ module.exports = {
 
         if (imdbUrl) {
           if (!imdbUrl.match(/https:\/\/www\.imdb\.com\/title\/tt\d+/)) {
-            await interaction.reply({ content: "Invalid IMDB URL.", flags: MessageFlags.Ephemeral });
+            await interaction.reply({
+              content: "Invalid IMDB URL.",
+              flags: MessageFlags.Ephemeral,
+            });
             break;
           }
           const movieIdMatch = imdbUrl.match(/title\/(tt\d+)/);
@@ -292,7 +301,10 @@ module.exports = {
           break;
         }
         if (movieData.type !== "movie") {
-          await interaction.reply({ content: "This is not a movie.", flags: MessageFlags.Ephemeral });
+          await interaction.reply({
+            content: "This is not a movie.",
+            flags: MessageFlags.Ephemeral,
+          });
           break;
         }
         if (
@@ -307,15 +319,14 @@ module.exports = {
           break;
         }
         const { primaryTitle: movieName } = movieData;
+        
+        movieNightData.movies.push({
+          movieName,
+          movieId,
+          watched: false,
+          suggestedByUserId: interaction.user.id,
+        });
 
-        const existingWatched = movieNightData.movies.find(
-          (movie) => movie.movieId === movieId && movie.watched === true,
-        );
-        if (existingWatched) {
-          existingWatched.watched = false;
-        } else {
-          movieNightData.movies.push({ movieName, movieId, watched: false });
-        }
         fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
 
         const imdbLink = imdbUrl || `https://www.imdb.com/title/${movieId}/`;
