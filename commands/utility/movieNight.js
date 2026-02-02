@@ -348,7 +348,7 @@ module.exports = {
           .slice(0, 15);
         if (movieNights.length === 0) {
           await interaction.reply({
-            content: "No watched movies with ratings yet.",
+            content: "No watched movies yet.",
             flags: MessageFlags.Ephemeral,
           });
           break;
