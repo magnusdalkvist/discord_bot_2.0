@@ -1,21 +1,13 @@
 {
+  "activePollId": "",
+  "activePollCreatedByUserId": "",
   "pendingEvents": {},
   "movies": [
     {
       "movieName": "Bring Her Back",
       "movieId": "tt32246771",
-      "watched": true
+      "watched": false
     }
   ],
-  "nights": [
-    {
-      "eventId": "1468004571325661234",
-      "movieId": "tt32246771",
-      "movieName": "Bring Her Back",
-      "channelId": "1467594730383868229",
-      "guildId": "476435508638253056",
-      "startTime": 1770069970401
-    }
-  ],
-  "activePollCreatedByUserId": "153183545005703168"
+  "nights": []
 }

@@ -72,7 +72,7 @@ module.exports = {
         const moviesForPoll = shuffled.slice(0, 10);
 
         const reply = await interaction.reply({
-          withResponse: true,
+          fetchReply: true,
           poll: {
             allowMultiselect: true,
             answers: moviesForPoll.map((movie) => ({ text: movie.movieName })),
@@ -371,7 +371,7 @@ module.exports = {
         }
         const movieTitle = night.movieName || "the movie";
         const pollMessage = await interaction.reply({
-          withResponse: true,
+          fetchReply: true,
           poll: {
             question: { text: `How much did you enjoy "${movieTitle}"?` },
             answers: [
