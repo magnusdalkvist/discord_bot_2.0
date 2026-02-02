@@ -86,11 +86,19 @@ module.exports = {
         });
 
         movieNightData.activePollId = reply.id;
+        movieNightData.activePollCreatedByUserId = interaction.user.id;
         fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
         break;
       }
       // start the movie night. find the last sent poll and end the poll. then create an event for the selected movie from the poll results.
       case "start": {
+        if (movieNightData.activePollCreatedByUserId && movieNightData.activePollCreatedByUserId !== interaction.user.id) {
+          await interaction.reply({
+            content: "Only the person who started the vote can start the movie night.",
+            ephemeral: true,
+          });
+          break;
+        }
         const filteredMovies = movieNightData.movies.filter((movie) => movie.watched === false);
         const messages = await interaction.channel.messages.fetch({
           id: movieNightData.activePollId,
