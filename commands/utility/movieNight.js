@@ -60,7 +60,7 @@ module.exports = {
     const movieNightData = getMovieNightData();
     const subcommand = interaction.options.getSubcommand();
     switch (subcommand) {
-      // Create a poll to vote on which movie to watch.
+      // Create a poll to vote on which movie to watch. Discord allows max 10 options; shuffle when more so it varies each time.
       case "vote": {
         const filteredMovies = movieNightData.movies.filter((movie) => movie.watched === false);
         if (filteredMovies.length === 0) {
@@ -68,11 +68,18 @@ module.exports = {
           break;
         }
 
+        const shuffled = [...filteredMovies];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        const moviesForPoll = shuffled.slice(0, 10);
+
         const reply = await interaction.reply({
           fetchReply: true,
           poll: {
             allowMultiselect: true,
-            answers: filteredMovies.map((movie) => ({ text: movie.movieName })),
+            answers: moviesForPoll.map((movie) => ({ text: movie.movieName })),
             duration: 1,
             question: { text: "What movie should we watch?" },
           },
