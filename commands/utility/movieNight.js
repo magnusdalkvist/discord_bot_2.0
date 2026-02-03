@@ -42,6 +42,9 @@ const data = new SlashCommandBuilder()
       ),
   )
   .addSubcommand((subcommand) =>
+    subcommand.setName("undo").setDescription("Undo the last suggestion you made"),
+  )
+  .addSubcommand((subcommand) =>
     subcommand.setName("history").setDescription("Show last watched movies and our ratings"),
   )
   .addSubcommand((subcommand) =>
@@ -404,6 +407,19 @@ module.exports = {
         night.ratingPollMessageId = pollMessage.id;
         fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
         scheduleFinalize(interaction.client, night, pollMessage.id);
+        break;
+      }
+      case "undo": {
+        // find the last suggestion made by the user that is not watched. then remove that one suggestion from the list.
+        const lastSuggestion = movieNightData.movies.filter((m) => m.suggestedByUserId === interaction.user.id && m.watched == false).reverse()[0];
+        if (!lastSuggestion) {
+          await interaction.reply({ content: "No suggestions to undo.", flags: MessageFlags.Ephemeral });
+          break;
+        }
+        // remove the suggestion from the list
+        movieNightData.movies = movieNightData.movies.filter((m) => !(m.movieId === lastSuggestion.movieId && m.suggestedByUserId === interaction.user.id));
+        fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+        await interaction.reply({ content: `Suggestion for **${lastSuggestion.movieName}** removed.` });
         break;
       }
     }

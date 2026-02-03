@@ -14,6 +14,114 @@
       "movieId": "tt29567915",
       "watched": false,
       "suggestedByUserId": "259311300834885633"
+    },
+    {
+      "movieName": "Epic Movie",
+      "movieId": "tt0799949",
+      "watched": false,
+      "suggestedByUserId": "246262224656662528"
+    },
+    {
+      "movieName": "Brothers",
+      "movieId": "tt0765010",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "Scream 7",
+      "movieId": "tt27047903",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "Iron Lung",
+      "movieId": "tt27564844",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "Zootopia 2",
+      "movieId": "tt26443597",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "F1: The Movie",
+      "movieId": "tt16311594",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "A Minecraft Movie",
+      "movieId": "tt3566834",
+      "watched": false,
+      "suggestedByUserId": "246262224656662528"
+    },
+    {
+      "movieName": "The Housemaid",
+      "movieId": "tt27543632",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "GOAT",
+      "movieId": "tt27613895",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "The Matrix",
+      "movieId": "tt0133093",
+      "watched": false,
+      "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "Pride & Prejudice",
+      "movieId": "tt0414387",
+      "watched": false,
+      "suggestedByUserId": "187622755427024896"
+    },
+    {
+      "movieName": "Good Will Hunting",
+      "movieId": "tt0119217",
+      "watched": false,
+      "suggestedByUserId": "187622755427024896"
+    },
+    {
+      "movieName": "Oldboy",
+      "movieId": "tt0364569",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
+    },
+    {
+      "movieName": "3 Idiots",
+      "movieId": "tt1187043",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
+    },
+    {
+      "movieName": "Battle Royale",
+      "movieId": "tt0266308",
+      "watched": false,
+      "suggestedByUserId": "147744064949714944"
+    },
+    {
+      "movieName": "Green Book",
+      "movieId": "tt6966692",
+      "watched": false,
+      "suggestedByUserId": "147744064949714944"
+    },
+    {
+      "movieName": "The Sixth Sense",
+      "movieId": "tt0167404",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
+    },
+    {
+      "movieName": "Skyfall",
+      "movieId": "tt1074638",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
     }
   ],
   "nights": []
