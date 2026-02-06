@@ -105,10 +105,7 @@ module.exports = {
           break;
         }
         const filteredMovies = movieNightData.movies.filter((movie) => movie.watched === false);
-        const messages = await interaction.channel.messages.fetch({
-          id: movieNightData.activePollId,
-        });
-        const message = Array.from(messages.values())[0];
+        const message = await interaction.channel.messages.fetch(movieNightData.activePollId);
         const poll = message.poll;
         if (!poll || poll.resultsFinalized) {
           await interaction.reply({

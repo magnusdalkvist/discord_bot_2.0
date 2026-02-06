@@ -1,5 +1,5 @@
 {
-  "activePollId": "1468010764882153568",
+  "activePollId": "1469440306108694793",
   "activePollCreatedByUserId": "153183545005703168",
   "pendingEvents": {},
   "movies": [
@@ -60,7 +60,7 @@
     {
       "movieName": "The Housemaid",
       "movieId": "tt27543632",
-      "watched": false,
+      "watched": true,
       "suggestedByUserId": "236563657285304320"
     },
     {
@@ -96,13 +96,13 @@
     {
       "movieName": "3 Idiots",
       "movieId": "tt1187043",
-      "watched": false,
+      "watched": true,
       "suggestedByUserId": "307226562065989634"
     },
     {
       "movieName": "Battle Royale",
       "movieId": "tt0266308",
-      "watched": false,
+      "watched": true,
       "suggestedByUserId": "147744064949714944"
     },
     {
@@ -122,7 +122,65 @@
       "movieId": "tt1074638",
       "watched": false,
       "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "3 Idiots",
+      "movieId": "tt1187043",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "Eternal Sunshine of the Spotless Mind",
+      "movieId": "tt0338013",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "Moneyball",
+      "movieId": "tt1210166",
+      "watched": false,
+      "suggestedByUserId": "147744064949714944"
+    },
+    {
+      "movieName": "Friday",
+      "movieId": "tt0113118",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
     }
   ],
-  "nights": []
+  "nights": [
+    {
+      "eventId": "1469374633349353607",
+      "movieId": "tt0266308",
+      "movieName": "Battle Royale",
+      "channelId": "1467594730383868229",
+      "guildId": "476435508638253056",
+      "startTime": 1770396622135,
+      "suggestedByUserId": "147744064949714944",
+      "ratingPollMessageId": "1469404924474560613",
+      "ratingScore": 6,
+      "ratingVotes": 6
+    },
+    {
+      "eventId": "1469406827795054685",
+      "movieId": "tt27543632",
+      "movieName": "The Housemaid",
+      "channelId": "1467594730383868229",
+      "guildId": "476435508638253056",
+      "startTime": 1770404299524,
+      "suggestedByUserId": "236563657285304320",
+      "ratingPollMessageId": "1469439878721831002",
+      "ratingScore": 8.571428571428571,
+      "ratingVotes": 7
+    },
+    {
+      "eventId": "1469444780520902733",
+      "movieId": "tt3566834",
+      "movieName": "A Minecraft Movie",
+      "channelId": "1467594730383868229",
+      "guildId": "476435508638253056",
+      "startTime": 1770413349647,
+      "suggestedByUserId": "246262224656662528"
+    }
+  ]
 }
