@@ -21,6 +21,142 @@ const getSecondsFromNow = (seconds) => {
   return Date.now() + seconds * 1000;
 };
 
+/**
+ * Resolve a movie from an IMDb URL or a search query (movie name).
+ * @param {string} imdbUrlOrName - Either an IMDb title URL or a movie name to search
+ * @returns {Promise<{ok: true, movieId: string, movieData: object}|{ok: false, error: string}>}
+ */
+async function resolveMovieFromInput(imdbUrlOrName) {
+  const trimmed = (imdbUrlOrName || "").trim();
+  if (!trimmed) {
+    return { ok: false, error: "empty" };
+  }
+
+  const imdbUrlRegex = /https?:\/\/(?:www\.)?imdb\.com\/title\/(tt\d+)/i;
+  const movieIdMatch = trimmed.match(imdbUrlRegex);
+
+  let movieId;
+  let movieData;
+
+  if (movieIdMatch) {
+    movieId = movieIdMatch[1];
+    const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
+    movieData = await movieRequest.json();
+  } else {
+    const searchRequest = await fetch(
+      `https://api.imdbapi.dev/search/titles?query=${encodeURIComponent(trimmed)}`,
+    );
+    const searchResponse = await searchRequest.json();
+    const titles = searchResponse.titles || [];
+    const firstMovie = titles.find((t) => t.type === "movie") || titles[0];
+    if (!firstMovie || !firstMovie.id) {
+      return { ok: false, error: "no_search_result" };
+    }
+    movieId = firstMovie.id;
+    const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
+    movieData = await movieRequest.json();
+  }
+
+  if (!movieData) {
+    return { ok: false, error: "not_found" };
+  }
+  if (movieData.type !== "movie") {
+    return { ok: false, error: "not_movie" };
+  }
+  return { ok: true, movieId, movieData };
+}
+
+/**
+ * Build event description and create the scheduled event from IMDB movie data.
+ * Mutates movieNightData.pendingEvents and writes movienight.json.
+ */
+async function createMovieNightEvent(interaction, movieNightData, imdbMovie, movieId) {
+  const {
+    primaryTitle,
+    startYear,
+    runtimeSeconds,
+    plot,
+    genres,
+    rating,
+    metacritic,
+    directors,
+    writers,
+    stars,
+    originCountries,
+    spokenLanguages,
+    primaryImage,
+  } = imdbMovie;
+
+  const directorNames = directors?.map((d) => d.displayName).join(", ") || "N/A";
+  const writerNames = writers?.map((w) => w.displayName).join(", ") || "N/A";
+  const starNames = stars?.map((s) => s.displayName).join(", ") || "N/A";
+  const countryNames = originCountries?.map((c) => c.name).join(", ") || "N/A";
+  const languageNames = spokenLanguages?.map((l) => l.name).join(", ") || "N/A";
+  const movieGenres = genres?.join(", ") || "N/A";
+  const releaseYear = startYear || "N/A";
+  const durationMinutes = runtimeSeconds ? Math.floor(runtimeSeconds / 60) : "N/A";
+  const imdbRating = rating?.aggregateRating
+    ? `${rating.aggregateRating}/10 (${rating.voteCount} votes)`
+    : "N/A";
+  const metacriticScore = metacritic?.score
+    ? `${metacritic.score}/100 (${metacritic.reviewCount} reviews)`
+    : "N/A";
+  const poster = primaryImage?.url || null;
+
+  let maxPlotLength = 500;
+  let formattedPlot = "";
+  if (plot) {
+    if (plot.length > maxPlotLength) {
+      let trimmed = plot.slice(0, maxPlotLength);
+      let lastSpace = trimmed.lastIndexOf(" ");
+      let cutoff = lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed;
+      formattedPlot = `${cutoff}...`;
+    } else {
+      formattedPlot = plot;
+    }
+  }
+  let description = formattedPlot ? `\n*${formattedPlot}*\n\n` : "\n";
+  description += `**Genres:** ${movieGenres}\n`;
+  description += `**Duration:** ${durationMinutes} minutes\n`;
+  description += `**Directors:** ${directorNames}\n`;
+  description += `**Writers:** ${writerNames}\n`;
+  description += `**Stars:** ${starNames}\n`;
+  description += `**Country:** ${countryNames}\n`;
+  description += `**Languages:** ${languageNames}\n`;
+  description += `**IMDb Rating:** ${imdbRating}\n`;
+  description += `**Metacritic:** ${metacriticScore}\n`;
+
+  const startTimestamp = getSecondsFromNow(5);
+  const endTimestamp =
+    durationMinutes !== "N/A"
+      ? startTimestamp + runtimeSeconds * 1000
+      : startTimestamp + 2 * 60 * 60 * 1000;
+
+  const event_manager = new GuildScheduledEventManager(interaction.guild);
+  const scheduledEvent = await event_manager.create({
+    name: `Movie Night: ${primaryTitle} (${releaseYear})`,
+    scheduledStartTime: startTimestamp,
+    scheduledEndTime: endTimestamp,
+    privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
+    entityType: GuildScheduledEventEntityType.External,
+    entityMetadata: {
+      location: "Dalles Filmklub",
+    },
+    description: description,
+    image: poster,
+    reason: `Scheduled for Movie Night: ${primaryTitle}`,
+  });
+
+  if (!movieNightData.pendingEvents) movieNightData.pendingEvents = {};
+  movieNightData.pendingEvents[scheduledEvent.id] = {
+    channelId: interaction.channel.id,
+    guildId: interaction.guild.id,
+    movieId,
+    movieName: primaryTitle,
+  };
+  fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+}
+
 const data = new SlashCommandBuilder()
   .setName("movienight")
   .setDescription("Movie Night commands")
@@ -28,7 +164,14 @@ const data = new SlashCommandBuilder()
     subcommand.setName("vote").setDescription("Create a poll to vote on which movie to watch"),
   )
   .addSubcommand((subcommand) =>
-    subcommand.setName("start").setDescription("Starts the movie night"),
+    subcommand
+      .setName("start")
+      .setDescription("Starts the movie night")
+      .addStringOption((option) =>
+        option
+          .setName("movie")
+          .setDescription("Force a specific movie by name or IMDb URL (skips the poll)"),
+      ),
   )
   .addSubcommand((subcommand) =>
     subcommand
@@ -92,8 +235,45 @@ module.exports = {
         fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
         break;
       }
-      // start the movie night. find the last sent poll and end the poll. then create an event for the selected movie from the poll results.
+      // start the movie night. optionally force a specific movie (name or IMDb URL); otherwise use poll winner.
       case "start": {
+        const forceMovie = interaction.options.getString("movie");
+
+        if (forceMovie) {
+          // Force path: resolve movie, ensure in list, create event (no poll).
+          const result = await resolveMovieFromInput(forceMovie);
+          if (!result.ok) {
+            const messages = {
+              empty: "Provide a movie name or IMDb URL.",
+              no_search_result: "No movie found for that search.",
+              not_found: "Movie not found.",
+              not_movie: "This is not a movie.",
+            };
+            await interaction.reply({
+              content: messages[result.error] || "Could not resolve movie.",
+              flags: MessageFlags.Ephemeral,
+            });
+            break;
+          }
+          const { movieId, movieData: imdbMovie } = result;
+          const existing = movieNightData.movies.find((m) => m.movieId === movieId);
+          if (!existing) {
+            movieNightData.movies.push({
+              movieName: imdbMovie.primaryTitle,
+              movieId,
+              watched: false,
+              suggestedByUserId: interaction.user.id,
+            });
+          }
+          await createMovieNightEvent(interaction, movieNightData, imdbMovie, movieId);
+          await interaction.reply({
+            content: `Movie night started with **${imdbMovie.primaryTitle}**.`,
+            flags: MessageFlags.Ephemeral,
+          });
+          break;
+        }
+
+        // Poll path: only poll creator can start; require active poll.
         if (
           movieNightData.activePollCreatedByUserId &&
           movieNightData.activePollCreatedByUserId !== interaction.user.id
@@ -119,10 +299,8 @@ module.exports = {
         await interaction.reply({ content: "Ending poll...", flags: MessageFlags.Ephemeral });
         await interaction.deleteReply();
 
-        // Find the poll answer with the most votes
         let winningAnswer = null;
         let maxVotes = -1;
-
         for (const answer of poll.answers.values()) {
           if (answer.voteCount > maxVotes) {
             maxVotes = answer.voteCount;
@@ -141,106 +319,14 @@ module.exports = {
           console.error("Error deleting create poll message:", err);
         }
 
-        // Fetch information about the winning movie from IMDB API
         const imdbMovieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
         const imdbMovie = await imdbMovieRequest.json();
-
         if (!imdbMovie) {
           await interaction.reply({ content: "Movie not found.", flags: MessageFlags.Ephemeral });
           break;
         }
 
-        // Prepare a detailed description from the IMDB movie data
-        const {
-          primaryTitle,
-          startYear,
-          runtimeSeconds,
-          plot,
-          genres,
-          rating,
-          metacritic,
-          directors,
-          writers,
-          stars,
-          originCountries,
-          spokenLanguages,
-          primaryImage,
-        } = imdbMovie;
-
-        // Prepare textual summary
-        const directorNames = directors?.map((d) => d.displayName).join(", ") || "N/A";
-        const writerNames = writers?.map((w) => w.displayName).join(", ") || "N/A";
-        const starNames = stars?.map((s) => s.displayName).join(", ") || "N/A";
-        const countryNames = originCountries?.map((c) => c.name).join(", ") || "N/A";
-        const languageNames = spokenLanguages?.map((l) => l.name).join(", ") || "N/A";
-        const movieGenres = genres?.join(", ") || "N/A";
-        const releaseYear = startYear || "N/A";
-        const durationMinutes = runtimeSeconds ? Math.floor(runtimeSeconds / 60) : "N/A";
-        const imdbRating = rating?.aggregateRating
-          ? `${rating.aggregateRating}/10 (${rating.voteCount} votes)`
-          : "N/A";
-        const metacriticScore = metacritic?.score
-          ? `${metacritic.score}/100 (${metacritic.reviewCount} reviews)`
-          : "N/A";
-        const poster = primaryImage?.url || null;
-
-        // Compose the event description
-        // Limit plot to a max length (250 chars) and end with "..." if truncated.
-        let maxPlotLength = 500;
-        let formattedPlot = "";
-        if (plot) {
-          if (plot.length > maxPlotLength) {
-            // Cut off at last whitespace within limit for cleaner stop
-            let trimmed = plot.slice(0, maxPlotLength);
-            let lastSpace = trimmed.lastIndexOf(" ");
-            let cutoff = lastSpace > 0 ? trimmed.slice(0, lastSpace) : trimmed;
-            formattedPlot = `${cutoff}...`;
-          } else {
-            formattedPlot = plot;
-          }
-        }
-        let description = formattedPlot ? `\n*${formattedPlot}*\n\n` : "\n";
-        description += `**Genres:** ${movieGenres}\n`;
-        description += `**Duration:** ${durationMinutes} minutes\n`;
-        description += `**Directors:** ${directorNames}\n`;
-        description += `**Writers:** ${writerNames}\n`;
-        description += `**Stars:** ${starNames}\n`;
-        description += `**Country:** ${countryNames}\n`;
-        description += `**Languages:** ${languageNames}\n`;
-        description += `**IMDb Rating:** ${imdbRating}\n`;
-        description += `**Metacritic:** ${metacriticScore}\n`;
-
-        // Schedule the event in 1 minute, and set end time according to movie length (or +2 hours if not known)
-        const startTimestamp = getSecondsFromNow(5);
-        const endTimestamp =
-          durationMinutes !== "N/A"
-            ? startTimestamp + runtimeSeconds * 1000
-            : startTimestamp + 2 * 60 * 60 * 1000;
-
-        const event_manager = new GuildScheduledEventManager(interaction.guild);
-        const scheduledEvent = await event_manager.create({
-          name: `Movie Night: ${primaryTitle} (${releaseYear})`,
-          scheduledStartTime: startTimestamp,
-          scheduledEndTime: endTimestamp,
-          privacyLevel: GuildScheduledEventPrivacyLevel.GuildOnly,
-          entityType: GuildScheduledEventEntityType.External,
-          entityMetadata: {
-            location: "Dalles Filmklub",
-          },
-          description: description,
-          image: poster,
-          reason: `Scheduled for Movie Night: ${primaryTitle}`,
-        });
-
-        if (!movieNightData.pendingEvents) movieNightData.pendingEvents = {};
-        movieNightData.pendingEvents[scheduledEvent.id] = {
-          channelId: interaction.channel.id,
-          guildId: interaction.guild.id,
-          movieId,
-          movieName: primaryTitle,
-        };
-        fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
-
+        await createMovieNightEvent(interaction, movieNightData, imdbMovie, movieId);
         break;
       }
       case "suggest": {
@@ -261,52 +347,29 @@ module.exports = {
           });
           break;
         }
-
-        let movieId;
-        let movieData;
-
-        if (imdbUrl) {
-          if (!imdbUrl.match(/https:\/\/www\.imdb\.com\/title\/tt\d+/)) {
-            await interaction.reply({
-              content: "Invalid IMDB URL.",
-              flags: MessageFlags.Ephemeral,
-            });
-            break;
-          }
-          const movieIdMatch = imdbUrl.match(/title\/(tt\d+)/);
-          movieId = movieIdMatch ? movieIdMatch[1] : null;
-          const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
-          movieData = await movieRequest.json();
-        } else {
-          const searchRequest = await fetch(
-            `https://api.imdbapi.dev/search/titles?query=${encodeURIComponent(movieNameQuery)}`,
-          );
-          const searchResponse = await searchRequest.json();
-          const titles = searchResponse.titles || [];
-          const firstMovie = titles.find((t) => t.type === "movie") || titles[0];
-          if (!firstMovie || !firstMovie.id) {
-            await interaction.reply({
-              content: "No movie found for that search.",
-              flags: MessageFlags.Ephemeral,
-            });
-            break;
-          }
-          movieId = firstMovie.id;
-          const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
-          movieData = await movieRequest.json();
-        }
-
-        if (!movieData) {
-          await interaction.reply({ content: "Movie not found.", flags: MessageFlags.Ephemeral });
-          break;
-        }
-        if (movieData.type !== "movie") {
+        if (imdbUrl && !imdbUrl.match(/https?:\/\/(?:www\.)?imdb\.com\/title\/tt\d+/i)) {
           await interaction.reply({
-            content: "This is not a movie.",
+            content: "Invalid IMDB URL.",
             flags: MessageFlags.Ephemeral,
           });
           break;
         }
+
+        const result = await resolveMovieFromInput(imdbUrl || movieNameQuery);
+        if (!result.ok) {
+          const messages = {
+            empty: "Provide either **imdb_url** or **movie_name**.",
+            no_search_result: "No movie found for that search.",
+            not_found: "Movie not found.",
+            not_movie: "This is not a movie.",
+          };
+          await interaction.reply({
+            content: messages[result.error] || "Could not resolve movie.",
+            flags: MessageFlags.Ephemeral,
+          });
+          break;
+        }
+        const { movieId, movieData } = result;
         if (
           movieNightData.movies.some(
             (movie) => movie.movieId === movieId && movie.watched === false,
@@ -318,15 +381,13 @@ module.exports = {
           });
           break;
         }
-        const { primaryTitle: movieName } = movieData;
-        
+        const movieName = movieData.primaryTitle;
         movieNightData.movies.push({
           movieName,
           movieId,
           watched: false,
           suggestedByUserId: interaction.user.id,
         });
-
         fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
 
         const imdbLink = imdbUrl || `https://www.imdb.com/title/${movieId}/`;
