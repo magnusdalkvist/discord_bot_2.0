@@ -386,6 +386,48 @@
       "movieId": "tt0914863",
       "watched": false,
       "suggestedByUserId": "236563657285304320"
+    },
+    {
+      "movieName": "Prisoners",
+      "movieId": "tt1392214",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "Babylon",
+      "movieId": "tt10640346",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "Swiss Army Man",
+      "movieId": "tt4034354",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "Seven Psychopaths",
+      "movieId": "tt1931533",
+      "watched": false,
+      "suggestedByUserId": "153183545005703168"
+    },
+    {
+      "movieName": "Legion",
+      "movieId": "tt1038686",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
+    },
+    {
+      "movieName": "Grave Encounters",
+      "movieId": "tt1703199",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
+    },
+    {
+      "movieName": "Doctor Dolittle",
+      "movieId": "tt0118998",
+      "watched": false,
+      "suggestedByUserId": "307226562065989634"
     }
   ],
   "nights": [

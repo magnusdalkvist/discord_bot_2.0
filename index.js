@@ -14,6 +14,10 @@ const { token } = require("./config");
 const { playSound, isConnected, leaveIfAlone } = require("./utils/voiceManager");
 const { getEntranceSound, setEntranceSound } = require("./utils/entranceSounds");
 const { movienightPath } = require("./utils/movieNightPolls");
+const {
+  scheduleNotification,
+  cancelPendingNotification,
+} = require("./utils/vcNotifications");
 
 // Create a new client instance
 const client = new Client({
@@ -296,6 +300,34 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // Handle button interactions for pagination and sound playback
   if (interaction.isButton()) {
     const customId = interaction.customId;
+
+    if (customId === "votekick_yes" || customId === "votekick_no") {
+      const votekickCommand = interaction.client.commands.get("votekick");
+      if (!votekickCommand || !votekickCommand.handleVoteButton) {
+        await interaction.reply({
+          content: "Error: Vote kick command not found.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      await votekickCommand.handleVoteButton(interaction);
+      return;
+    }
+
+    if (customId === "voterole_yes" || customId === "voterole_no") {
+      const voteroleCommand = interaction.client.commands.get("voterole");
+      if (!voteroleCommand || !voteroleCommand.handleVoteButton) {
+        await interaction.reply({
+          content: "Error: Role vote command not found.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      await voteroleCommand.handleVoteButton(interaction);
+      return;
+    }
 
     // Handle pagination buttons
     if (customId.startsWith("previous_page_") || customId.startsWith("next_page_")) {
@@ -644,6 +676,15 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
       // Play entrance sound if user has one set
       await playEntranceSound(newState.channel, guild.id, member.user.id, member.user.tag);
+
+      // Schedule VC join notification (with grace period & cooldown)
+      scheduleNotification({
+        guildId: guild.id,
+        targetUserId: member.user.id,
+        voiceChannel: newState.channel,
+        guild,
+        targetDisplayName: member.displayName,
+      });
     }
     // User switched channels (was in one channel, now in another)
     else if (oldState.channel && newState.channel && oldState.channel.id !== newState.channel.id) {
@@ -652,11 +693,18 @@ client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
 
       // Play entrance sound if user has one set (bot should join/switch to new channel)
       await playEntranceSound(newState.channel, guild.id, member.user.id, member.user.tag);
+
+      // Cancel any pending notification and don't re-notify on channel switch
+      // (they're already in VC, just moving around — not a new "join")
+      cancelPendingNotification(guild.id, member.user.id);
     }
     // User left a voice channel
     else if (oldState.channel && !newState.channel) {
       // Check if bot should leave (if alone)
       leaveIfAlone(guild, 2000);
+
+      // Cancel pending notification if user left before grace period ended
+      cancelPendingNotification(guild.id, member.user.id);
     }
   } catch (error) {
     console.error("Error in voice state update handler:", error);
