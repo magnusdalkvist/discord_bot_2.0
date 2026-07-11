@@ -13,7 +13,7 @@ const {
 const { token } = require("./config");
 const { playSound, isConnected, leaveIfAlone } = require("./utils/voiceManager");
 const { getEntranceSound, setEntranceSound } = require("./utils/entranceSounds");
-const { movienightPath } = require("./utils/movieNightPolls");
+const { loadMovieNightData, saveMovieNightData } = require("./utils/movieNightPolls");
 const {
   scheduleNotification,
   cancelPendingNotification,
@@ -123,7 +123,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
     return;
   }
 
-  const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
+  const data = loadMovieNightData();
   if (!data.pendingEvents) data.pendingEvents = {};
   if (!data.nights) data.nights = [];
 
@@ -134,7 +134,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
   if (newStatusNum === 4) {
     delete data.pendingEvents[newEvent.id];
     data.nights = data.nights.filter((n) => n.eventId !== newEvent.id);
-    fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+    saveMovieNightData(data);
     return;
   }
 
@@ -152,7 +152,7 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
         suggestedByUserId: movieEntry?.suggestedByUserId ?? null,
       });
       delete data.pendingEvents[newEvent.id];
-      fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+      saveMovieNightData(data);
     }
     return;
   }
@@ -180,17 +180,17 @@ client.on(Events.GuildScheduledEventUpdate, async (oldEvent, newEvent) => {
     }
     const movie = (data.movies || []).find((m) => m.movieId === night.movieId);
     if (movie) movie.watched = true;
-    fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+    saveMovieNightData(data);
   }
 });
 
 client.on(Events.GuildScheduledEventDelete, async (event) => {
   if (!event.name || !event.name.startsWith("Movie Night:")) return;
-  const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
+  const data = loadMovieNightData();
   if (!data.pendingEvents) data.pendingEvents = {};
   delete data.pendingEvents[event.id];
   data.nights = (data.nights || []).filter((n) => n.eventId !== event.id);
-  fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+  saveMovieNightData(data);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {

@@ -1,10 +1,32 @@
-const fs = require("node:fs");
-const path = require("node:path");
+const db = require("./db");
 
-const movienightPath = path.join(__dirname, "..", "movienight.json");
+const MOVIENIGHT_KEY = "movienight";
+
+const getStmt = db.prepare("SELECT value FROM kv_store WHERE key = ?");
+const setStmt = db.prepare(
+  "INSERT INTO kv_store (key, value) VALUES (?, ?) " +
+    "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+);
+
+/**
+ * Load the movienight data document.
+ * @returns {Object}
+ */
+function loadMovieNightData() {
+  const row = getStmt.get(MOVIENIGHT_KEY);
+  return row ? JSON.parse(row.value) : {};
+}
+
+/**
+ * Save the movienight data document.
+ * @param {Object} data
+ */
+function saveMovieNightData(data) {
+  setStmt.run(MOVIENIGHT_KEY, JSON.stringify(data));
+}
 
 async function finalizeRatingPoll(client, guildId, channelId, messageId) {
-  const data = JSON.parse(fs.readFileSync(movienightPath, "utf8"));
+  const data = loadMovieNightData();
   const night = (data.nights || []).find((n) => n.ratingPollMessageId === messageId);
   if (!night) return;
   const guild = client.guilds.cache.get(guildId);
@@ -37,7 +59,7 @@ async function finalizeRatingPoll(client, guildId, channelId, messageId) {
   night.ratingVotes = totalVotes;
   const movie = (data.movies || []).find((m) => m.movieId === night.movieId);
   if (movie) movie.watched = true;
-  fs.writeFileSync(movienightPath, JSON.stringify(data, null, 2));
+  saveMovieNightData(data);
   try {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     await message.delete();
@@ -53,4 +75,4 @@ function scheduleFinalize(client, night, messageId) {
   );
 }
 
-module.exports = { scheduleFinalize, movienightPath };
+module.exports = { scheduleFinalize, loadMovieNightData, saveMovieNightData };

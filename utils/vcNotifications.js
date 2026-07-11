@@ -1,7 +1,20 @@
-const fs = require("fs");
-const path = require("path");
+const db = require("./db");
 
-const SUBSCRIPTIONS_FILE = path.join(__dirname, "..", "subscriptions.json");
+const getSubscriptionsStmt = db.prepare(
+  "SELECT target_id FROM subscriptions WHERE guild_id = ? AND subscriber_id = ?"
+);
+const getSubscribersStmt = db.prepare(
+  "SELECT subscriber_id FROM subscriptions WHERE guild_id = ? AND target_id = ?"
+);
+const hasSubscriptionStmt = db.prepare(
+  "SELECT 1 FROM subscriptions WHERE guild_id = ? AND subscriber_id = ? AND target_id = ?"
+);
+const insertSubscriptionStmt = db.prepare(
+  "INSERT INTO subscriptions (guild_id, subscriber_id, target_id) VALUES (?, ?, ?)"
+);
+const deleteSubscriptionStmt = db.prepare(
+  "DELETE FROM subscriptions WHERE guild_id = ? AND subscriber_id = ? AND target_id = ?"
+);
 
 // Cooldown tracking: Map<guildId:targetUserId, timestamp>
 const notificationCooldowns = new Map();
@@ -16,34 +29,6 @@ const COOLDOWN_MS = 5 * 60 * 1000;
 const GRACE_PERIOD_MS = 5 * 1000;
 
 /**
- * Load subscriptions from file
- * @returns {Object} { guildId: { subscriberUserId: [targetUserId, ...] } }
- */
-function loadSubscriptions() {
-  try {
-    if (fs.existsSync(SUBSCRIPTIONS_FILE)) {
-      const data = fs.readFileSync(SUBSCRIPTIONS_FILE, "utf8");
-      return JSON.parse(data);
-    }
-  } catch (error) {
-    console.error("Error loading subscriptions:", error);
-  }
-  return {};
-}
-
-/**
- * Save subscriptions to file
- * @param {Object} subscriptions
- */
-function saveSubscriptions(subscriptions) {
-  try {
-    fs.writeFileSync(SUBSCRIPTIONS_FILE, JSON.stringify(subscriptions, null, 2));
-  } catch (error) {
-    console.error("Error saving subscriptions:", error);
-  }
-}
-
-/**
  * Subscribe a user to another user's VC joins in a guild
  * @param {string} guildId
  * @param {string} subscriberUserId - The user who wants notifications
@@ -55,16 +40,11 @@ function subscribe(guildId, subscriberUserId, targetUserId) {
     return { success: false, message: "You can't subscribe to yourself!" };
   }
 
-  const subs = loadSubscriptions();
-  if (!subs[guildId]) subs[guildId] = {};
-  if (!subs[guildId][subscriberUserId]) subs[guildId][subscriberUserId] = [];
-
-  if (subs[guildId][subscriberUserId].includes(targetUserId)) {
+  if (hasSubscriptionStmt.get(guildId, subscriberUserId, targetUserId)) {
     return { success: false, message: "You're already subscribed to this user!" };
   }
 
-  subs[guildId][subscriberUserId].push(targetUserId);
-  saveSubscriptions(subs);
+  insertSubscriptionStmt.run(guildId, subscriberUserId, targetUserId);
   return { success: true, message: "Successfully subscribed!" };
 }
 
@@ -76,28 +56,11 @@ function subscribe(guildId, subscriberUserId, targetUserId) {
  * @returns {{ success: boolean, message: string }}
  */
 function unsubscribe(guildId, subscriberUserId, targetUserId) {
-  const subs = loadSubscriptions();
-  if (
-    !subs[guildId] ||
-    !subs[guildId][subscriberUserId] ||
-    !subs[guildId][subscriberUserId].includes(targetUserId)
-  ) {
+  if (!hasSubscriptionStmt.get(guildId, subscriberUserId, targetUserId)) {
     return { success: false, message: "You're not subscribed to this user!" };
   }
 
-  subs[guildId][subscriberUserId] = subs[guildId][subscriberUserId].filter(
-    (id) => id !== targetUserId,
-  );
-
-  // Clean up empty arrays/objects
-  if (subs[guildId][subscriberUserId].length === 0) {
-    delete subs[guildId][subscriberUserId];
-  }
-  if (Object.keys(subs[guildId]).length === 0) {
-    delete subs[guildId];
-  }
-
-  saveSubscriptions(subs);
+  deleteSubscriptionStmt.run(guildId, subscriberUserId, targetUserId);
   return { success: true, message: "Successfully unsubscribed!" };
 }
 
@@ -108,8 +71,7 @@ function unsubscribe(guildId, subscriberUserId, targetUserId) {
  * @returns {string[]} Array of target user IDs
  */
 function getSubscriptions(guildId, subscriberUserId) {
-  const subs = loadSubscriptions();
-  return subs[guildId]?.[subscriberUserId] || [];
+  return getSubscriptionsStmt.all(guildId, subscriberUserId).map((row) => row.target_id);
 }
 
 /**
@@ -120,17 +82,7 @@ function getSubscriptions(guildId, subscriberUserId) {
  * @returns {string[]} Array of subscriber user IDs
  */
 function getSubscribers(guildId, targetUserId) {
-  const subs = loadSubscriptions();
-  const guildSubs = subs[guildId];
-  if (!guildSubs) return [];
-
-  const subscribers = [];
-  for (const [subscriberId, targets] of Object.entries(guildSubs)) {
-    if (targets.includes(targetUserId)) {
-      subscribers.push(subscriberId);
-    }
-  }
-  return subscribers;
+  return getSubscribersStmt.all(guildId, targetUserId).map((row) => row.subscriber_id);
 }
 
 /**

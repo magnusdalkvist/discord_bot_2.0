@@ -7,14 +7,10 @@ const {
   MessageFlags,
 } = require("discord.js");
 
-const fs = require("fs");
-const path = require("path");
-const { scheduleFinalize } = require("../../utils/movieNightPolls");
-
-const movienightPath = path.join(__dirname, "../../movienight.json");
+const { scheduleFinalize, loadMovieNightData, saveMovieNightData } = require("../../utils/movieNightPolls");
 
 const getMovieNightData = () => {
-  return JSON.parse(fs.readFileSync(movienightPath, "utf8"));
+  return loadMovieNightData();
 };
 
 const getSecondsFromNow = (seconds) => {
@@ -68,7 +64,7 @@ async function resolveMovieFromInput(imdbUrlOrName) {
 
 /**
  * Build event description and create the scheduled event from IMDB movie data.
- * Mutates movieNightData.pendingEvents and writes movienight.json.
+ * Mutates movieNightData.pendingEvents and persists it via saveMovieNightData.
  */
 async function createMovieNightEvent(interaction, movieNightData, imdbMovie, movieId) {
   const {
@@ -154,7 +150,7 @@ async function createMovieNightEvent(interaction, movieNightData, imdbMovie, mov
     movieId,
     movieName: primaryTitle,
   };
-  fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+  saveMovieNightData(movieNightData);
 }
 
 const data = new SlashCommandBuilder()
@@ -232,7 +228,7 @@ module.exports = {
 
         movieNightData.activePollId = reply.id;
         movieNightData.activePollCreatedByUserId = interaction.user.id;
-        fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+        saveMovieNightData(movieNightData);
         break;
       }
       // start the movie night. optionally force a specific movie (name or IMDb URL); otherwise use poll winner.
@@ -388,7 +384,7 @@ module.exports = {
           watched: false,
           suggestedByUserId: interaction.user.id,
         });
-        fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+        saveMovieNightData(movieNightData);
 
         const imdbLink = imdbUrl || `https://www.imdb.com/title/${movieId}/`;
         const embed = new EmbedBuilder()
@@ -463,7 +459,7 @@ module.exports = {
           },
         });
         night.ratingPollMessageId = pollMessage.id;
-        fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+        saveMovieNightData(movieNightData);
         scheduleFinalize(interaction.client, night, pollMessage.id);
         break;
       }
@@ -476,7 +472,7 @@ module.exports = {
         }
         // remove the suggestion from the list
         movieNightData.movies = movieNightData.movies.filter((m) => !(m.movieId === lastSuggestion.movieId && m.suggestedByUserId === interaction.user.id));
-        fs.writeFileSync(movienightPath, JSON.stringify(movieNightData, null, 2));
+        saveMovieNightData(movieNightData);
         await interaction.reply({ content: `Suggestion for **${lastSuggestion.movieName}** removed.` });
         break;
       }
