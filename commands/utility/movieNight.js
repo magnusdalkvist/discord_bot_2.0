@@ -8,6 +8,7 @@ const {
 } = require("discord.js");
 
 const { scheduleFinalize, loadMovieNightData, saveMovieNightData } = require("../../utils/movieNightPolls");
+const { tmdbApiKey } = require("../../config");
 
 const getMovieNightData = () => {
   return loadMovieNightData();
@@ -16,6 +17,58 @@ const getMovieNightData = () => {
 const getSecondsFromNow = (seconds) => {
   return Date.now() + seconds * 1000;
 };
+
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const TMDB_IMAGE_BASE_URL = "https://image.tmdb.org/t/p/w500";
+
+/**
+ * Call a TMDb API path. Throws if the API is unreachable or returns an error status.
+ */
+async function tmdbFetch(path) {
+  const url = new URL(`${TMDB_BASE_URL}${path}`);
+  url.searchParams.set("api_key", tmdbApiKey);
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`TMDb API returned ${response.status} for ${path}`);
+  }
+  return response.json();
+}
+
+/**
+ * Map a TMDb /movie/{id} (with credits) response onto the field shape the rest of this
+ * file expects (originally modeled on the now-defunct api.imdbapi.dev response shape).
+ */
+function mapTmdbMovieDetails(details) {
+  const crew = details.credits?.crew || [];
+  return {
+    primaryTitle: details.title,
+    startYear: details.release_date ? Number(details.release_date.slice(0, 4)) : null,
+    runtimeSeconds: details.runtime ? details.runtime * 60 : null,
+    plot: details.overview || null,
+    genres: (details.genres || []).map((g) => g.name),
+    rating: { aggregateRating: details.vote_average || null, voteCount: details.vote_count || null },
+    metacritic: null,
+    directors: crew.filter((c) => c.job === "Director").map((c) => ({ displayName: c.name })),
+    writers: crew.filter((c) => c.department === "Writing").map((c) => ({ displayName: c.name })),
+    stars: (details.credits?.cast || []).slice(0, 5).map((c) => ({ displayName: c.name })),
+    originCountries: (details.production_countries || []).map((c) => ({ name: c.name })),
+    spokenLanguages: (details.spoken_languages || []).map((l) => ({ name: l.english_name || l.name })),
+    primaryImage: details.poster_path ? { url: `${TMDB_IMAGE_BASE_URL}${details.poster_path}` } : null,
+    imdbId: details.imdb_id || null,
+  };
+}
+
+/**
+ * Fetch full movie details by IMDb ID (tt#######) via TMDb's external-ID lookup.
+ * Returns null if TMDb has no movie for that IMDb ID. Throws on network/API errors.
+ */
+async function fetchImdbTitle(imdbId) {
+  const findResult = await tmdbFetch(`/find/${imdbId}?external_source=imdb_id`);
+  const tmdbMovie = (findResult.movie_results || [])[0];
+  if (!tmdbMovie) return null;
+  const details = await tmdbFetch(`/movie/${tmdbMovie.id}?append_to_response=credits`);
+  return mapTmdbMovieDetails(details);
+}
 
 /**
  * Resolve a movie from an IMDb URL or a search query (movie name).
@@ -31,35 +84,29 @@ async function resolveMovieFromInput(imdbUrlOrName) {
   const imdbUrlRegex = /https?:\/\/(?:www\.)?imdb\.com\/title\/(tt\d+)/i;
   const movieIdMatch = trimmed.match(imdbUrlRegex);
 
-  let movieId;
   let movieData;
 
-  if (movieIdMatch) {
-    movieId = movieIdMatch[1];
-    const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
-    movieData = await movieRequest.json();
-  } else {
-    const searchRequest = await fetch(
-      `https://api.imdbapi.dev/search/titles?query=${encodeURIComponent(trimmed)}`,
-    );
-    const searchResponse = await searchRequest.json();
-    const titles = searchResponse.titles || [];
-    const firstMovie = titles.find((t) => t.type === "movie") || titles[0];
-    if (!firstMovie || !firstMovie.id) {
-      return { ok: false, error: "no_search_result" };
+  try {
+    if (movieIdMatch) {
+      movieData = await fetchImdbTitle(movieIdMatch[1]);
+    } else {
+      const searchResult = await tmdbFetch(`/search/movie?query=${encodeURIComponent(trimmed)}`);
+      const firstMovie = (searchResult.results || [])[0];
+      if (!firstMovie) {
+        return { ok: false, error: "no_search_result" };
+      }
+      const details = await tmdbFetch(`/movie/${firstMovie.id}?append_to_response=credits`);
+      movieData = mapTmdbMovieDetails(details);
     }
-    movieId = firstMovie.id;
-    const movieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
-    movieData = await movieRequest.json();
+  } catch (err) {
+    console.error("Error contacting TMDb API:", err);
+    return { ok: false, error: "network_error" };
   }
 
-  if (!movieData) {
+  if (!movieData || !movieData.imdbId) {
     return { ok: false, error: "not_found" };
   }
-  if (movieData.type !== "movie") {
-    return { ok: false, error: "not_movie" };
-  }
-  return { ok: true, movieId, movieData };
+  return { ok: true, movieId: movieData.imdbId, movieData };
 }
 
 /**
@@ -74,7 +121,6 @@ async function createMovieNightEvent(interaction, movieNightData, imdbMovie, mov
     plot,
     genres,
     rating,
-    metacritic,
     directors,
     writers,
     stars,
@@ -91,11 +137,8 @@ async function createMovieNightEvent(interaction, movieNightData, imdbMovie, mov
   const movieGenres = genres?.join(", ") || "N/A";
   const releaseYear = startYear || "N/A";
   const durationMinutes = runtimeSeconds ? Math.floor(runtimeSeconds / 60) : "N/A";
-  const imdbRating = rating?.aggregateRating
-    ? `${rating.aggregateRating}/10 (${rating.voteCount} votes)`
-    : "N/A";
-  const metacriticScore = metacritic?.score
-    ? `${metacritic.score}/100 (${metacritic.reviewCount} reviews)`
+  const tmdbRating = rating?.aggregateRating
+    ? `${Number(rating.aggregateRating).toFixed(1)}/10 (${rating.voteCount} votes)`
     : "N/A";
   const poster = primaryImage?.url || null;
 
@@ -119,8 +162,7 @@ async function createMovieNightEvent(interaction, movieNightData, imdbMovie, mov
   description += `**Stars:** ${starNames}\n`;
   description += `**Country:** ${countryNames}\n`;
   description += `**Languages:** ${languageNames}\n`;
-  description += `**IMDb Rating:** ${imdbRating}\n`;
-  description += `**Metacritic:** ${metacriticScore}\n`;
+  description += `**TMDb Rating:** ${tmdbRating}\n`;
 
   const startTimestamp = getSecondsFromNow(5);
   const endTimestamp =
@@ -243,7 +285,7 @@ module.exports = {
               empty: "Provide a movie name or IMDb URL.",
               no_search_result: "No movie found for that search.",
               not_found: "Movie not found.",
-              not_movie: "This is not a movie.",
+              network_error: "Couldn't reach the movie database (TMDb) — please try again in a bit.",
             };
             await interaction.reply({
               content: messages[result.error] || "Could not resolve movie.",
@@ -315,10 +357,19 @@ module.exports = {
           console.error("Error deleting create poll message:", err);
         }
 
-        const imdbMovieRequest = await fetch(`https://api.imdbapi.dev/titles/${movieId}`);
-        const imdbMovie = await imdbMovieRequest.json();
+        let imdbMovie;
+        try {
+          imdbMovie = await fetchImdbTitle(movieId);
+        } catch (err) {
+          console.error("Error contacting TMDb API:", err);
+          await interaction.followUp({
+            content: "Couldn't reach the movie database (TMDb) — please try again in a bit.",
+            flags: MessageFlags.Ephemeral,
+          });
+          break;
+        }
         if (!imdbMovie) {
-          await interaction.reply({ content: "Movie not found.", flags: MessageFlags.Ephemeral });
+          await interaction.followUp({ content: "Movie not found.", flags: MessageFlags.Ephemeral });
           break;
         }
 
@@ -357,7 +408,7 @@ module.exports = {
             empty: "Provide either **imdb_url** or **movie_name**.",
             no_search_result: "No movie found for that search.",
             not_found: "Movie not found.",
-            not_movie: "This is not a movie.",
+            network_error: "Couldn't reach the movie database (TMDb) — please try again in a bit.",
           };
           await interaction.reply({
             content: messages[result.error] || "Could not resolve movie.",
@@ -393,7 +444,7 @@ module.exports = {
           .setThumbnail(movieData.primaryImage?.url || null)
           .setURL(imdbLink)
           .setFooter({
-            text: `IMDB Rating: ${movieData.rating?.aggregateRating}/10 (${movieData.rating?.voteCount} votes)`,
+            text: `TMDb Rating: ${Number(movieData.rating?.aggregateRating || 0).toFixed(1)}/10 (${movieData.rating?.voteCount || 0} votes)`,
           });
         await interaction.reply({ content: "New movie suggested:", embeds: [embed] });
 
